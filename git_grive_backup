@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# @param GIT_DIR: directory containing git repositories.
+# @param GDRIVE_DIR: local google drive directory. It has to be initialized once
+#                    with `grive -a`.
+#
+# For every git repository in specified folder, this script will create a bundle
+# and save it to specified local google drive folder. When all bundles are
+# copied, it will synchronize local drive with online drive.
+
+# TODO: add an option to save partial bundles
+
+GIT_DIR=`readlink -f $1`
+GDRIVE_DIR=`readlink -f $2`
+
+# Create bundles and save them to local google drive directory
+NOW=$(date +"%Y-%m-%d_%H-%M-%S")
+for REPO in `ls ${GIT_DIR}`
+do
+    cd ${GIT_DIR}/${REPO}
+    if [ -d .git ]; then
+        echo "Creating bundle of repository ${REPO}"
+        git bundle create ${GDRIVE_DIR}/${REPO}_${NOW}.bundle --all
+    fi
+done
+
+# Synchronize google drive: it will upload bundles.
+cd ${GDRIVE_DIR}
+grive
