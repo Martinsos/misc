@@ -9,6 +9,7 @@
 # copied, it will synchronize local drive with online drive.
 
 # TODO: add an option to save partial bundles
+# TODO: encrypt bundles
 
 GIT_DIR=`readlink -f $1`
 GDRIVE_DIR=`readlink -f $2`
