@@ -3,16 +3,40 @@
 # @param GIT_DIR: directory containing git repositories.
 # @param GDRIVE_DIR: local google drive directory. It has to be initialized once
 #                    with `grive -a`.
+# @param PASS_FILE: File whose first line is passphrase.
 #
 # For every git repository in specified folder, this script will create a bundle
 # and save it to specified local google drive folder. When all bundles are
 # copied, it will synchronize local drive with online drive.
 
 # TODO: add an option to save partial bundles
-# TODO: encrypt bundles. Use openssl?
+# TODO: Implement restore
 
-GIT_DIR=`readlink -f $1`
-GDRIVE_DIR=`readlink -f $2`
+usage() {
+    echo "TODO"
+}
+
+RESTORE=0
+
+while getopts "g:d:p:r" o; do
+    case "${o}" in
+        g)
+            GIT_DIR=`readlink -f ${OPTARG}`
+            ;;
+        d)
+            GDRIVE_DIR=`readlink -f ${OPTARG}`
+            ;;
+        p)
+            PASS_FILE=`readlink -f ${OPTARG}`
+            ;;
+        r)
+            RESTORE=1
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
 
 # Create bundles and save them to local google drive directory
 NOW=$(date +"%Y-%m-%d_%H-%M-%S")
@@ -21,7 +45,10 @@ do
     cd ${GIT_DIR}/${REPO}
     if [ -d .git ]; then
         echo "Creating bundle of repository ${REPO}"
-        git bundle create ${GDRIVE_DIR}/${REPO}_${NOW}.bundle --all
+        TMP_FILE=`mktemp`
+        git bundle create ${TMP_FILE} --all
+        openssl aes-256-cbc -salt -in ${TMP_FILE} -out ${GDRIVE_DIR}/${REPO}_${NOW}.bundle.enc -pass file:${PASS_FILE}
+        rm ${TMP_FILE}
     fi
 done
 
