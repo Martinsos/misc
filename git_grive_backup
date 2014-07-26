@@ -16,8 +16,6 @@ usage() {
     echo "TODO"
 }
 
-RESTORE=0
-
 while getopts "g:d:p:r" o; do
     case "${o}" in
         g)
@@ -38,20 +36,49 @@ while getopts "g:d:p:r" o; do
     esac
 done
 
-# Create bundles and save them to local google drive directory
 NOW=$(date +"%Y-%m-%d_%H-%M-%S")
-for REPO in `ls ${GIT_DIR}`
-do
-    cd ${GIT_DIR}/${REPO}
-    if [ -d .git ]; then
-        echo "Creating bundle of repository ${REPO}"
-        TMP_FILE=`mktemp`
-        git bundle create ${TMP_FILE} --all
-        openssl aes-256-cbc -salt -in ${TMP_FILE} -out ${GDRIVE_DIR}/${REPO}_${NOW}.bundle.enc -pass file:${PASS_FILE}
-        rm ${TMP_FILE}
-    fi
-done
 
-# Synchronize google drive: it will upload bundles.
-cd ${GDRIVE_DIR}
-grive
+if [ -z "${RESTORE}" ]; then # If RESTORE is not set, do backup
+    # Create bundles and save them to local google drive directory
+    mkdir ${GDRIVE_DIR}/${NOW}
+    for REPO in `ls ${GIT_DIR}`
+    do
+        cd ${GIT_DIR}/${REPO}
+        if [ -d .git ]; then
+            echo "Creating bundle of repository ${REPO}"
+            TMP_FILE=`mktemp`
+            git bundle create ${TMP_FILE} --all
+            openssl aes-256-cbc -salt -in ${TMP_FILE} -out ${GDRIVE_DIR}/${NOW}/${REPO}.bundle.enc -pass file:${PASS_FILE}
+            rm ${TMP_FILE}
+        fi
+    done
+    # Synchronize google drive: it will upload bundles.
+    cd ${GDRIVE_DIR}
+    grive
+else # If RESTORE is set, do restoration
+    # Synchronize google drive: it will download missing bundles.
+    cd ${GDRIVE_DIR}
+    grive
+    
+    LATEST_BACKUP_DIR=${GDRIVE_DIR}/`ls ${GDRIVE_DIR} | sort -r | head -1`
+    
+    # Prepare git directory that will container repositories.
+    # If it already exists, rename it and mark as old one and create empty one.
+    if [ ! -d "${GIT_DIR}" ]; then
+        mkdir ${GIT_DIR}
+    fi
+    if [ `ls -A ${GIT_DIR}` ]; then
+        mv ${GIT_DIR} ${GIT_DIR}_local_${NOW} #TODO: If this is not sucessfull, stop the script!
+        mkdir ${GIT_DIR}
+    fi
+    
+    cd ${GIT_DIR}
+    for ENC_BUNDLE in `ls ${LATEST_BACKUP_DIR}`
+    do
+        REPO=`echo ${ENC_BUNDLE} | sed 's/\.bundle\.enc$//'`
+        BUNDLE=${REPO}.bundle
+        openssl aes-256-cbc -d -salt -in ${LATEST_BACKUP_DIR}/${ENC_BUNDLE} -out ${BUNDLE} -pass file:${PASS_FILE}
+        git clone ${BUNDLE}
+        rm ${BUNDLE}
+    done
+fi
