@@ -19,6 +19,7 @@
 
 # TODO: add an option to save partial bundles
 # TODO: add input validation, currently does not work I do not know why.
+# TODO: add cleanup of old backups, so it does not take more and more memory.
 
 usage() {
 cat << EOF
